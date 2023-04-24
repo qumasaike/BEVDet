@@ -202,11 +202,10 @@ class MVXTwoStageDetector(Base3DDetector):
             x = self.pts_neck(x)
         return x
 
-    def extract_feat(self, points, img, img_metas):
+    def extract_feat(self, img, img_metas):
         """Extract features from images and points."""
         img_feats = self.extract_img_feat(img, img_metas)
-        pts_feats = self.extract_pts_feat(points, img_feats, img_metas)
-        return (img_feats, pts_feats)
+        return img_feats
 
     @torch.no_grad()
     @force_fp32()
