@@ -156,9 +156,7 @@ train_pipeline = [
     dict(
         type='PrepareImageInputs',
         is_train=True,
-        data_config=data_config,
-        sequential=False,
-        ego_cam='image0',),
+        data_config=data_config),
     dict(
         type='LoadAnnotationsBEVDepth',
         bda_aug_conf=bda_aug_conf,

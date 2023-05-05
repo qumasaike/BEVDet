@@ -64,32 +64,22 @@ class NuScenesDataset(Custom3DDataset):
             Defaults to None, which use the mean of all cameras.
     """
     NameMapping = {
-        'movable_object.barrier': 'barrier',
-        'vehicle.bicycle': 'bicycle',
-        'vehicle.bus.bendy': 'bus',
-        'vehicle.bus.rigid': 'bus',
-        'vehicle.car': 'car',
-        'vehicle.construction': 'construction_vehicle',
-        'vehicle.motorcycle': 'motorcycle',
-        'human.pedestrian.adult': 'pedestrian',
-        'human.pedestrian.child': 'pedestrian',
-        'human.pedestrian.construction_worker': 'pedestrian',
-        'human.pedestrian.police_officer': 'pedestrian',
-        'movable_object.trafficcone': 'traffic_cone',
-        'vehicle.trailer': 'trailer',
-        'vehicle.truck': 'truck'
+        'Car': 'Car',
+        'Truck': 'Truck',
+        'Van': 'Van',
+        'Pedestrian': 'Pedestrian', 
+        'Cyclist': 'Cyclist', 
+        'Trafficcone': 'Trafficcone', 
+        'Others': 'Others'
     }
     DefaultAttribute = {
-        'car': 'vehicle.parked',
-        'pedestrian': 'pedestrian.moving',
-        'trailer': 'vehicle.parked',
-        'truck': 'vehicle.parked',
-        'bus': 'vehicle.moving',
-        'motorcycle': 'cycle.without_rider',
-        'construction_vehicle': 'vehicle.parked',
-        'bicycle': 'cycle.without_rider',
-        'barrier': '',
-        'traffic_cone': '',
+        'Car': 'vehicle.parked',
+        # 'Truck': 'vehicle.parked',
+        'Van': 'vehicle.parked',
+        'Pedestrian': 'pedestrian.moving', 
+        'Cyclist': 'cycle.with_rider', 
+        'Trafficcone': '', 
+        'Others': ''
     }
     AttrMapping = {
         'cycle.with_rider': 0,
@@ -119,9 +109,7 @@ class NuScenesDataset(Custom3DDataset):
         'vel_err': 'mAVE',
         'attr_err': 'mAAE'
     }
-    CLASSES = ('car', 'truck', 'trailer', 'bus', 'construction_vehicle',
-               'bicycle', 'motorcycle', 'pedestrian', 'traffic_cone',
-               'barrier')
+    CLASSES = ('Car', 'Van', 'Pedestrian', 'Cyclist', 'Trafficcone', 'Others')
 
     def __init__(self,
                  ann_file,
@@ -138,7 +126,9 @@ class NuScenesDataset(Custom3DDataset):
                  use_valid_flag=False,
                  img_info_prototype='mmcv',
                  multi_adj_frame_id_cfg=None,
-                 ego_cam='CAM_FRONT'):
+                 ego_cam='image0'
+                #  ego_cam='image0'
+                 ):
         self.load_interval = load_interval
         self.use_valid_flag = use_valid_flag
         super().__init__(
@@ -202,7 +192,8 @@ class NuScenesDataset(Custom3DDataset):
             list[dict]: List of annotations sorted by timestamps.
         """
         data = mmcv.load(ann_file, file_format='pkl')
-        data_infos = list(sorted(data['infos'], key=lambda e: e['timestamp']))
+        # data_infos = list(sorted(data['infos'], key=lambda e: e['timestamp']))
+        data_infos = data['infos']
         data_infos = data_infos[::self.load_interval]
         self.metadata = data['metadata']
         self.version = self.metadata['version']
@@ -229,11 +220,14 @@ class NuScenesDataset(Custom3DDataset):
         """
         info = self.data_infos[index]
         # standard protocol modified from SECOND.Pytorch
+        # input_dict = dict(
+        #     sample_idx=info['token'],
+        #     pts_filename=info['lidar_path'],
+        #     sweeps=info['sweeps'],
+        #     timestamp=info['timestamp'] / 1e6,
+        # )
         input_dict = dict(
-            sample_idx=info['token'],
             pts_filename=info['lidar_path'],
-            sweeps=info['sweeps'],
-            timestamp=info['timestamp'] / 1e6,
         )
         if 'ann_infos' in info:
             input_dict['ann_infos'] = info['ann_infos']
@@ -382,6 +376,7 @@ class NuScenesDataset(Custom3DDataset):
                             'bus',
                             'truck',
                             'trailer',
+                            'Van'
                     ]:
                         attr = 'vehicle.moving'
                     elif name in ['bicycle', 'motorcycle']:
@@ -396,7 +391,7 @@ class NuScenesDataset(Custom3DDataset):
                     else:
                         attr = self.DefaultAttribute[name]
                 nusc_anno = dict(
-                    sample_token=sample_token,
+                    # sample_token=sample_token,
                     translation=nusc_box.center.tolist(),
                     size=nusc_box.wlh.tolist(),
                     rotation=nusc_box.orientation.elements.tolist(),

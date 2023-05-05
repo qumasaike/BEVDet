@@ -11,7 +11,7 @@ class_mapping = {
   'Others':5
 }
 
-results = json.load(open("trainzjdet_Anchor3DHead_2daug/pts_bbox/results_nusc.json", "rb"))
+results = json.load(open("trainzjdet_CenterHead_2daug/pts_bbox/results_nusc.json", "rb"))
 for name in results['results'].keys():
     lines = []
     f = open('results/dt/' + name + '.txt','w')

@@ -94,11 +94,12 @@ class GridSample(nn.Module):
 
     def forward(self, inputs):
 
-        # (feature, rots, trans, intrins, post_rots, post_trans, bda) = x
+
         # rots 和 trans 是外参， intrincs 是内参
         # post_rots, post_trans 是数据增强在图像平面做的平移和旋转
         # bda是bev data augumentaion,在bev平面上做了一些变换。
-        (features, rots, trans, intrins, post_rots, post_trans, bda, (img_H, img_W)) = inputs
+        # (features, rots, trans, intrins, post_rots, post_trans, bda, (img_H, img_W)) = inputs
+        (features, sensor2egos, ego2globals, intrins, post_rots, post_trans, bda, (img_H, img_W)) = inputs
         B, N, C, feature_H, feature_W = features.shape
         coordinates_3d = self.coordinates_3d.cuda()
         coordinates_3d = coordinates_3d.expand((B,*coordinates_3d.shape))
@@ -106,8 +107,8 @@ class GridSample(nn.Module):
 
         #体素坐标转为各个相机的相机坐标系
         c3d = bda.view(B, 1, 1, 1, 3, 3).matmul(coordinates_3d.unsqueeze(-1)).squeeze(-1)
-        c3d = c3d - trans.view(B, N, 1, 1, 1, 3)
-        c3d = torch.inverse(rots).view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
+        c3d = c3d - sensor2egos[:,:,:3,3].view(B, N, 1, 1, 1, 3)
+        c3d = torch.inverse(sensor2egos[:,:,:3,:3]).view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
 
         # 转为像素uv坐标系
         c3d_image = intrins.view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)

@@ -12,6 +12,8 @@ from .mvx_two_stage import MVXTwoStageDetector
 
 @DETECTORS.register_module()
 class ZJDet(MVXTwoStageDetector):
+# class ZJDet(CenterPoint):
+  
     r"""BEVDet paradigm for multi-camera 3D object detection.
 
     Please refer to the `paper <https://arxiv.org/abs/2112.11790>`_

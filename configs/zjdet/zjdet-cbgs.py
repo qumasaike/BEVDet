@@ -225,7 +225,8 @@ train_pipeline = [
         is_train=True,
         data_config=data_config,
         sequential=False,
-        ego_cam='image0',),
+        # ego_cam='image0',
+        ),
     dict(
         type='LoadAnnotationsBEVDepth',
         bda_aug_conf=bda_aug_conf,
@@ -240,7 +241,8 @@ train_pipeline = [
 test_pipeline = [
     dict(type='PrepareImageInputs', data_config=data_config,
         sequential=False,
-        ego_cam='image0',),
+        # ego_cam='image0',
+        ),
     dict(
         type='LoadAnnotationsBEVDepth',
         bda_aug_conf=bda_aug_conf,
@@ -286,24 +288,44 @@ test_data_config = dict(
     classes=class_names,
     ann_file=data_root + 'bevdetv2-zjdata_infos_val.pkl')
 
+# data = dict(
+#     samples_per_gpu=4,
+#     workers_per_gpu=4,
+#     train=dict(
+#         data_root=data_root,
+#         ann_file=data_root + 'bevdetv2-zjdata_infos_train.pkl',
+#         pipeline=train_pipeline,
+#         classes=class_names,
+#         test_mode=False,
+#         use_valid_flag=True,
+#         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+#         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+#         box_type_3d='LiDAR'),
+#     val=test_data_config,
+#     test=test_data_config)
+
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
+        type='CBGSDataset',
+        dataset=dict(
         data_root=data_root,
         ann_file=data_root + 'bevdetv2-zjdata_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,
-        use_valid_flag=True,
+        use_valid_flag=False,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
+        box_type_3d='LiDAR')),
     val=test_data_config,
     test=test_data_config)
 
-for key in ['train', 'val', 'test']:
+for key in ['val', 'test']:
     data[key].update(share_data_config)
+data['train']['dataset'].update(share_data_config)
+
 
 # Optimizer
 optimizer = dict(type='AdamW', lr=2e-4, weight_decay=1e-07)
