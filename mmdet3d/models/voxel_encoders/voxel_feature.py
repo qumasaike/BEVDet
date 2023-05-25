@@ -113,16 +113,25 @@ def convbn(in_planes,
 
 @VOXEL_ENCODERS.register_module()
 class VoxelFeature(nn.Module):
-    def __init__(self, input_channels,  output_channels, Ncams, gn, **kwargs):
+    def __init__(self, input_channels,  output_channels, Ncams, gn, scales=[1], **kwargs):
         super().__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.GN = gn
+        self.pools = []
+        self.rpn3d_conv2s = []
+        for scale in scales:
+            self.pools.append(torch.nn.MaxPool3d(scale))
+            self.rpn3d_conv2s.append(nn.Sequential(
+                convbn(int(self.input_channels / scale), self.output_channels,
+                      3, 1, 1, 1, gn=self.GN),
+                nn.ReLU(inplace=True)).cuda())
 
-        self.rpn3d_conv2 = nn.Sequential(
-            convbn(self.input_channels, self.output_channels,
-                   3, 1, 1, 1, gn=self.GN),
-            nn.ReLU(inplace=True))
+
+        # self.rpn3d_conv2 = nn.Sequential(
+        #     convbn(self.input_channels, self.output_channels,
+        #            3, 1, 1, 1, gn=self.GN),
+        #     nn.ReLU(inplace=True))
         self.rpn3d_conv3 = hourglass2d(self.output_channels, gn=self.GN)
 
         self.init_params()
@@ -159,28 +168,36 @@ class VoxelFeature(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
+
     def forward(self, Voxel):
 
-        B, N, C, D, H, W = Voxel.shape
+        out = []
+        for pool, rpn3d_conv2 in zip(self.pools, self.rpn3d_conv2s):
+            B, N, C, D, H, W = Voxel.shape
+            Voxel_pooled = pool(Voxel.view(B*N,*Voxel.shape[2:]))
+            Voxel_pooled = Voxel_pooled.view(B, N, *Voxel_pooled.shape[1:])
+            B, N, C, D, H, W = Voxel_pooled.shape
 
-        Voxel = Voxel.view(B, N*C, D, -1)
-        spatial_features = self.height_compress(Voxel)
+            Voxel_pooled = Voxel_pooled.view(B, N*C, D, -1)
+            spatial_features = self.height_compress(Voxel_pooled)
 
-        # depth_mask = self.compute_depth(spatial_features)
-        # depth_mask = depth_mask.view(B, D, H, W)
+            # depth_mask = self.compute_depth(spatial_features)
+            # depth_mask = depth_mask.view(B, D, H, W)
 
-        spatial_features = spatial_features.view(
-            *spatial_features.shape[:3], H, W)
-        # spatial_features = spatial_features*depth_mask.unsqueeze(1)
-        
-        N, C, D, H, W = spatial_features.shape
+            spatial_features = spatial_features.view(
+                *spatial_features.shape[:3], H, W)
+            # spatial_features = spatial_features*depth_mask.unsqueeze(1)
+            
+            N, C, D, H, W = spatial_features.shape
 
-        spatial_features = spatial_features.view(N, -1, H, W)
+            spatial_features = spatial_features.view(N, -1, H, W)
 
-        x = self.rpn3d_conv2(spatial_features)
-        x = self.rpn3d_conv3(x, None, None)[0]
-        # import cv2
-        # show = x[0][0].detach().cpu().numpy()
-        # show = (show-show.min()) / (show.max()-show.min())*255
-        # cv2.imwrite('query.jpg', show)
-        return x
+            x = rpn3d_conv2(spatial_features)
+            x = self.rpn3d_conv3(x, None, None)[0]
+            out.append(x)
+
+            # import cv2
+            # show = x[0][0].detach().cpu().numpy()
+            # show = (show-show.min()) / (show.max()-show.min())*255
+            # cv2.imwrite('query.jpg', show)
+        return out

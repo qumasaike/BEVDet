@@ -45,7 +45,7 @@ class ZJDet(MVXTwoStageDetector):
         B, N, C, imH, imW = imgs.shape
         imgs = imgs.view(B * N, C, imH, imW)
         x = self.img_backbone(imgs)
-        x = [imgs] + list(x)
+        # x = [imgs] + list(x)
         if self.with_img_neck:
             x = self.img_neck(x)
             if type(x) in [list, tuple]:
@@ -60,7 +60,10 @@ class ZJDet(MVXTwoStageDetector):
         x = self.image_encoder(img[0])
         x = self.img_view_transformer([x] + img[1:7] + [(img_H,img_W)])
         x = self.voxel_feature_encoder(x)
-        return [x], None
+        if not type(x) is list:
+            x = [x]
+        return x, None
+
 
     def extract_feat(self, points, img, img_metas, **kwargs):
         """Extract features from images and points."""
@@ -152,13 +155,15 @@ class ZJDet(MVXTwoStageDetector):
                     len(img_inputs), len(img_metas)))
 
         if not isinstance(img_inputs[0][0], list):
-            img_H,img_W = img_inputs[0][0].shape[-2:]
-            # img_feats = self.extract_img_feat(img_inputs, img_metas)
-            x = self.image_encoder(img_inputs[0][0])
-            x = self.img_view_transformer([x] + img_inputs[0][1:7] + [(img_H,img_W)])
-            img_feats = self.voxel_feature_encoder(x)
+            # img_H,img_W = img_inputs[0][0].shape[-2:]
+            # # img_feats = self.extract_img_feat(img_inputs, img_metas)
+            # x = self.image_encoder(img_inputs[0][0])
+            # x = self.img_view_transformer([x] + img_inputs[0][1:7] + [(img_H,img_W)])
+            # img_feats = self.voxel_feature_encoder(x)
+            img_feats, pts_feats, _ = self.extract_feat(
+                points, img=img_inputs[0], img_metas=img_metas, **kwargs)
             bbox_list = [dict() for _ in range(len(img_metas))]
-            bbox_pts = self.simple_test_pts([img_feats], img_metas[0], rescale=False)
+            bbox_pts = self.simple_test_pts(img_feats, img_metas[0], rescale=False)
             for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
                 result_dict['pts_bbox'] = pts_bbox
             return bbox_list

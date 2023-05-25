@@ -107,7 +107,7 @@ class GridSample(nn.Module):
 
         #体素坐标转为各个相机的相机坐标系
         c3d = bda.view(B, 1, 1, 1, 3, 3).matmul(coordinates_3d.unsqueeze(-1)).squeeze(-1)
-        c3d = c3d - sensor2egos[:,:,:3,3].view(B, N, 1, 1, 1, 3)
+        c3d = c3d.view(B,1,*c3d.shape[1:]) - sensor2egos[:,:,:3,3].view(B, N, 1, 1, 1, 3)
         c3d = torch.inverse(sensor2egos[:,:,:3,:3]).view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
 
         # 转为像素uv坐标系
