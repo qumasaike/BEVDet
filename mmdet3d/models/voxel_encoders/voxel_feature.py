@@ -126,6 +126,7 @@ class VoxelFeature(nn.Module):
                 convbn(int(self.input_channels / scale), self.output_channels,
                       3, 1, 1, 1, gn=self.GN),
                 nn.ReLU(inplace=True)).cuda())
+        self.rpn3d_conv2s = nn.ModuleList(self.rpn3d_conv2s)
 
 
         # self.rpn3d_conv2 = nn.Sequential(

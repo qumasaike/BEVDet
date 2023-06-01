@@ -58,7 +58,7 @@ class ZJDet(MVXTwoStageDetector):
         """Extract features of images."""
         img_H,img_W = img[0].shape[-2:]
         x = self.image_encoder(img[0])
-        x = self.img_view_transformer([x] + img[1:7] + [(img_H,img_W)])
+        x = self.img_view_transformer([x] + img[1:8] + [(img_H,img_W)])
         x = self.voxel_feature_encoder(x)
         if not type(x) is list:
             x = [x]
@@ -201,3 +201,63 @@ class ZJDet(MVXTwoStageDetector):
         return outs
 
  
+@DETECTORS.register_module()
+class ZJDetTRT(ZJDet):
+    def result_serialize(self, outs):
+        outs_ = []
+        for out in outs:
+            for key in ['reg', 'height', 'dim', 'rot', 'vel', 'heatmap']:
+                outs_.append(out[0][key])
+        return outs_
+
+    def result_deserialize(self, outs):
+        outs_ = []
+        keys = ['reg', 'height', 'dim', 'rot', 'vel', 'heatmap']
+        for head_id in range(len(outs) // 6):
+            outs_head = [dict()]
+            for kid, key in enumerate(keys):
+                outs_head[0][key] = outs[head_id * 6 + kid]
+            outs_.append(outs_head)
+        return outs_
+
+    def forward(
+        self,
+        img_inputs=None,
+        img_metas=None,
+        points=None,
+        proposals=None,
+        gt_bboxes_ignore=None,
+        **kwargs
+    ):
+        from mmdet3d.core.bbox import get_box_type
+        box_type_3d, box_mode_3d = get_box_type("LiDAR")
+        img_metas = [[{
+          'flip':False,
+          'pcd_horizontal_flip':False,
+          'pcd_vertical_flip':False,
+          'box_mode_3d':box_mode_3d,
+          'box_type_3d':box_type_3d,
+          'pcd_scale_factor':1.0,
+          'pts_filename':""
+        }]]
+        img_feats, pts_feats, _ = self.extract_feat(
+            points, img=img_inputs[0], img_metas=img_metas, **kwargs)
+        # bbox_list = [dict() for _ in range(len(img_metas))]
+        # bbox_pts = self.simple_test_pts(img_feats, img_metas[0], rescale=False)
+        # for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
+        #     result_dict['pts_bbox'] = pts_bbox
+        # return bbox_list
+
+        # bbox_list = [dict() for _ in range(len(img_metas))]
+        result_dict = {}
+        bbox_pts = self.simple_test_pts(img_feats, img_metas[0], rescale=False)
+        for pts_bbox in bbox_pts:
+            # result_dict['pts_bbox'] = pts_bbox
+            boxes_3d, scores_3d, labels_3d = \
+               pts_bbox['boxes_3d'].tensor, pts_bbox['scores_3d'],pts_bbox['labels_3d']
+        return boxes_3d, scores_3d, labels_3d
+
+    def get_bev_pool_input(self, input):
+        input = self.prepare_inputs(input)
+        coor = self.img_view_transformer.get_lidar_coor(*input[1:7])
+        return self.img_view_transformer.voxel_pooling_prepare_v2(coor)

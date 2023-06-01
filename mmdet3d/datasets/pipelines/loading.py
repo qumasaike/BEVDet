@@ -1074,6 +1074,7 @@ class LoadAnnotationsBEVDepth(object):
         results['gt_labels_3d'] = gt_labels
         imgs, rots, trans, intrins = results['img_inputs'][:4]
         post_rots, post_trans = results['img_inputs'][4:]
-        results['img_inputs'] = (imgs, rots, trans, intrins, post_rots,
+        rots_inverse = torch.inverse(rots)
+        results['img_inputs'] = (imgs, rots, rots_inverse, trans, intrins, post_rots,
                                  post_trans, bda_rot)
         return results
