@@ -8,6 +8,8 @@ import pdb
 import time
 from ..builder import NECKS
 import numpy as np
+from copy import deepcopy
+
 
 def project_pseudo_lidar_to_rectcam(pts_3d):
     xs, ys, zs = pts_3d[..., 0], pts_3d[..., 1], pts_3d[..., 2]
@@ -43,6 +45,7 @@ class GridSample(nn.Module):
         self.grid_size = (
             self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(self.voxel_size)
         self.grid_size = np.round(self.grid_size).astype(np.int64)
+        self.init_coord_imgs_ = False
         self.prepare_coordinates_3d(point_cloud_range, voxel_size)
         self.init_params()
 
@@ -90,6 +93,28 @@ class GridSample(nn.Module):
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
+    
+    def init_coord_imgs(self, ego2sensors, intrins):
+        coordinates_3d = self.coordinates_3d.cuda()
+        coordinates_3d = coordinates_3d.expand((1,*coordinates_3d.shape))
+        B_, bev_D, bev_H, bev_W, _ = coordinates_3d.shape
+        coord_imgs = []
+        for ego2sensor, intrin in zip(ego2sensors[0], intrins[0]):
+            c3d = ego2sensor[:3,:3].matmul(coordinates_3d.view(-1,3).transpose(0,1)).transpose(0,1) + ego2sensor[:3,3]
+            c3d_image = intrin.matmul(c3d.transpose(0,1)).transpose(0,1)
+            coord_img = torch.stack(
+                    (c3d_image[..., 0]/c3d_image[..., 2], c3d_image[..., 1]/c3d_image[..., 2]), dim=-1)
+            kept_not = (coord_img[..., -1] < 0)
+            # kept_not = (c3d_image[..., -1] < 0) | (coord_img[:,0]<0) | (coord_img[:,1]<0) | (coord_img[:,0]>720) | (coord_img[:,1]>1280)
+            kept_not = kept_not.unsqueeze(-1).expand((bev_D*bev_H*bev_W, 2))
+            coord_img = torch.where(kept_not, torch.tensor(-10000.,
+                            device=coord_img.device), coord_img.clone().detach())
+            coord_img = torch.where(torch.abs(coord_img) > 10000, torch.tensor(-1000.,
+                            device=coord_img.device), coord_img.clone().detach())
+            coord_imgs.append(coord_img.view(1, bev_D, bev_H, bev_W, 2))
+        self.coord_imgs = torch.cat(coord_imgs).unsqueeze(0)
+        self.init_coord_imgs_ = True
+        return
 
     def forward(self, inputs):
 
@@ -105,36 +130,69 @@ class GridSample(nn.Module):
         coordinates_3d = coordinates_3d.expand((B,*coordinates_3d.shape))
         B_, bev_D, bev_H, bev_W, _ = coordinates_3d.shape
 
-        #体素坐标转为各个相机的相机坐标系
-        c3d = bda.view(B, 1, 1, 1, 3, 3).matmul(coordinates_3d.unsqueeze(-1)).squeeze(-1)
-        c3d = c3d.view(B,1,*c3d.shape[1:]) - sensor2egos[:,:,:3,3].view(B, N, 1, 1, 1, 3)
-        c3d = ego2sensors[:,:,:3,:3].view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
 
-        # 转为像素uv坐标系
-        c3d_image = intrins.view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
-        coord_img = torch.stack(
-            (c3d_image[..., 0]/c3d_image[..., 2], c3d_image[..., 1]/c3d_image[..., 2]), dim=-1)
-        kept_not = coord_img[..., -1] < 0
-        kept_not = kept_not.unsqueeze(-1).expand((B, N, bev_D, bev_H, bev_W, 2))
-        coord_img = torch.where(kept_not, torch.tensor(-10000.,
-                            device=coord_img.device), coord_img.clone().detach())
-        coord_img = torch.where(torch.abs(coord_img) > 10000, torch.tensor(-1000.,
-                            device=coord_img.device), coord_img.clone().detach())
-        
-        # 像素uv坐标系转换到图像数据增强后的uv坐标系
-        coord_img = post_rots[:,:,:2,:2].view(B, N, 1, 1, 1, 2, 2) \
-                    .matmul(coord_img.unsqueeze(-1)).squeeze(-1) \
-                    + post_trans[:,:,:2].view(B, N, 1, 1, 1, 2)
+        if not self.init_coord_imgs_:
+        #体素坐标转为各个相机的相机坐标系
+            c3d = bda.view(B, 1, 1, 1, 3, 3).matmul(coordinates_3d.unsqueeze(-1)).squeeze(-1)
+            c3d = c3d.view(B,1,*c3d.shape[1:]) - sensor2egos[:,:,:3,3].view(B, N, 1, 1, 1, 3)
+            c3d = ego2sensors[:,:,:3,:3].view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
+
+            # 转为像素uv坐标系
+            c3d_image = intrins.view(B, N, 1, 1, 1, 3, 3).matmul(c3d.unsqueeze(-1)).squeeze(-1)
+            coord_img = torch.stack(
+                (c3d_image[..., 0]/c3d_image[..., 2], c3d_image[..., 1]/c3d_image[..., 2]), dim=-1)
+            kept_not = coord_img[..., -1] < 0
+            kept_not = kept_not.unsqueeze(-1).expand((B, N, bev_D, bev_H, bev_W, 2))
+            coord_img = torch.where(kept_not, torch.tensor(-10000.,
+                                device=coord_img.device), coord_img.clone().detach())
+            coord_img = torch.where(torch.abs(coord_img) > 10000, torch.tensor(-1000.,
+                                device=coord_img.device), coord_img.clone().detach())
+            
+            # 像素uv坐标系转换到图像数据增强后的uv坐标系
+            coord_imgs = post_rots[:,:,:2,:2].view(B, N, 1, 1, 1, 2, 2) \
+                        .matmul(coord_img.unsqueeze(-1)).squeeze(-1) \
+                        + post_trans[:,:,:2].view(B, N, 1, 1, 1, 2)
+
+        else:
+            coord_imgs = self.coord_imgs
+
+
+        # 转onnx trt 需要
+        # coord_imgs = []
+                
+        # for ego2sensor, intrin in zip(ego2sensors[0], intrins[0]):
+            
+        #     c3d = ego2sensor[:3,:3].matmul(coordinates_3d.view(-1,3).transpose(0,1)).transpose(0,1) + ego2sensor[:3,3]
+        #     c3d_image = intrin.matmul(c3d.transpose(0,1)).transpose(0,1)
+        #     coord_img = torch.stack(
+        #             (c3d_image[..., 0]/c3d_image[..., 2], c3d_image[..., 1]/c3d_image[..., 2]), dim=-1)
+        #     # kept_not = (c3d_image[..., -1] < 0)
+        #     kept_not = (c3d_image[..., -1] < 0) | (coord_img[:,0]<0) | (coord_img[:,1]<0) | (coord_img[:,0]>720) | (coord_img[:,1]>1280)
+        #     kept_not = kept_not.unsqueeze(-1).expand((bev_D*bev_H*bev_W, 2))
+        #     coord_img = torch.where(kept_not, torch.tensor(-10000.,
+        #                     device=coord_img.device), coord_img.clone().detach())
+        #     coord_img = torch.where(torch.abs(coord_img) > 10000, torch.tensor(-1000.,
+        #                     device=coord_img.device), coord_img.clone().detach())
+        #     coord_imgs.append(coord_img.view(1, bev_D, bev_H, bev_W, 2))
+        # coord_imgs = torch.cat(coord_imgs).unsqueeze(0)
 
         crop_x1, crop_x2 = 0, img_W
         crop_y1, crop_y2 = 0, img_H
         norm_coord_img = \
-            (coord_img - torch.as_tensor([crop_x1, crop_y1], device=coord_img.device)) /\
-            torch.as_tensor([crop_x2 - 1 - crop_x1, crop_y2 - 1 - crop_y1],device=coord_img.device)
+            (coord_imgs - torch.as_tensor([crop_x1, crop_y1], device=coord_imgs.device)) /\
+            torch.as_tensor([crop_x2 - 1 - crop_x1, crop_y2 - 1 - crop_y1],device=coord_imgs.device)
         norm_coord_img = norm_coord_img * 2. - 1.
 
         Voxels = F.grid_sample(
                               features.view(B*N,C,feature_H,feature_W), 
                               norm_coord_img.view(B*N, bev_D*bev_H, bev_W,2), align_corners=True).view(B, N, C, bev_D, bev_H, bev_W)
-        
+        # Voxels = []
+        # features = features.view(B*N,C,feature_H,feature_W)
+        # norm_coord_img = norm_coord_img.view(B*N, bev_D*bev_H, bev_W,2)
+        # for i in range(len(features)):
+        #     Voxels.append(F.grid_sample(
+        #                       features[i].view(1,C,feature_H,feature_W), 
+        #                       norm_coord_img[i].view(1, bev_D*bev_H, bev_W,2), align_corners=True))
+        # Voxels = torch.cat(Voxels).view(B, N, C, bev_D, bev_H, bev_W)
+        # Voxels = norm_coord_img.view(B, N, 2, bev_D, bev_H, bev_W).repeat((1,1,16,1,1,1))
         return Voxels

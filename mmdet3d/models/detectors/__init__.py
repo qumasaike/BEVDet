@@ -19,7 +19,7 @@ from .smoke_mono3d import SMOKEMono3D
 from .ssd3dnet import SSD3DNet
 from .votenet import VoteNet
 from .voxelnet import VoxelNet
-from .zjdet import ZJDet, ZJDetTRT
+from .zjdet import ZJDet, ZJDetTRT0, ZJDetTRT1
 
 __all__ = [
     'Base3DDetector', 'VoxelNet', 'DynamicVoxelNet', 'MVXTwoStageDetector',

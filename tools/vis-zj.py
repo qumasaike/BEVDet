@@ -72,7 +72,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Visualize the predicted '
                                      'result of nuScenes')
     parser.add_argument(
-        '--res', default="trainzjdet/pts_bbox/results_nusc.json",help='Path to the predicted result in json format')
+        '--res', default="./pts_bbox/results_nusc.json",help='Path to the predicted result in json format')
     parser.add_argument(
         '--show-range',
         type=int,
@@ -105,7 +105,7 @@ def parse_args():
     parser.add_argument(
         '--root_path',
         type=str,
-        default='./datasets/zjdata',
+        default='./datasets/zjdata_E1',
         help='Path to nuScenes dataset')
     parser.add_argument(
         '--save_path',
@@ -135,7 +135,7 @@ def main():
     res = json.load(open(args.res, 'r'))
     # load dataset information
     info_path = \
-        args.root_path + '/bevdetv2-zjdata_infos_%s.pkl' % args.version
+        args.root_path + '/zjdet_E1_infos_%s.pkl' % args.version
     dataset = pickle.load(open(info_path, 'rb'))
     # prepare save path and medium
     vis_dir = args.save_path
@@ -161,7 +161,7 @@ def main():
     ]
     print('start visualizing results')
     for cnt, infos in enumerate(
-            dataset['infos'][:min(args.vis_frames, len(dataset['infos']))]):
+            dataset['infos'][200:min(args.vis_frames, len(dataset['infos']))]):
         if cnt % 10 == 0:
             print('%d/%d' % (cnt, min(args.vis_frames, len(dataset['infos']))))
         # collect instances

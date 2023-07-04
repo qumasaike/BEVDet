@@ -4,8 +4,7 @@ _base_ = ['../_base_/datasets/nus-3d.py', '../_base_/default_runtime.py']
 # Global
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
-# point_cloud_range = [-26.8, -32.0, -3.0, 50.0, 32.0, 1.0]
-point_cloud_range = [-32.0, -26.8, -3.0, 32.0, 50.0,  1.0]
+point_cloud_range = [-6.8, -32.0, -3.0, 70.0, 32.0, 1.0]
 # For nuScenes we usually do 10-class detection
 class_names = [
     'Car', 'Van', 'Pedestrian', 'Cyclist', 'Trafficcone', 'Others'
@@ -13,10 +12,10 @@ class_names = [
 
 data_config = {
     'cams': [
-        'image0','image1','image2','image3','image4','image5','image6','image7'
+        'image0', 'image1', 'image2', 'image5', 
     ],
     'Ncams':
-    8,
+    4,
     'input_size': (720, 1280),#(256, 704),
     'src_size': (720, 1280),
 
@@ -36,7 +35,7 @@ data_config = {
 # Model
 
 
-voxel_size = [0.2, 0.2, 0.2]
+voxel_size = [0.8, 0.8, 0.8]
 
 numC_Trans = 80
 
@@ -67,27 +66,26 @@ model = dict(
     img_view_transformer=dict(
         type='GridSample',
         voxel_size=voxel_size,
-        point_cloud_range=point_cloud_range,
+        point_cloud_range=[-6.8, -32.0, -3.0, 70, 32.0, 1.0],
         ),
     voxel_feature_encoder=dict(
         type='VoxelFeature',
-        input_channels=160,
+        input_channels=40,
         output_channels=64,
         Ncams=data_config['Ncams'],
         gn=True),
-    temporal_fusion=dict(
-        type='TemporalSelfAttention',),
-    dense_head=dict(type='DenseHead'),
+    # temporal_fusion=dict(
+    #     type='TemporalSelfAttention',),
+    # dense_head=dict(type='DenseHead'),
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=6,
         in_channels=64,
         feat_channels=64,
         use_direction_classifier=True,
-        # voxel_size=voxel_size,
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
-            ranges=[point_cloud_range],
+            ranges=[[-6.8, -32.0, -3.0, 70, 32.0, 1.0]],
             # scales=[1, 2, 4],
             scales=[1],
             sizes=[
@@ -131,7 +129,7 @@ model = dict(
         pts=dict(
             use_rotate_nms=True,
             nms_across_levels=False,
-            nms_pre=100,
+            nms_pre=1000,
             nms_thr=0.2,
             score_thr=0.05,
             min_bbox_size=0,
@@ -203,7 +201,7 @@ model = dict(
 
 # Data
 dataset_type = 'NuScenesDataset'
-data_root = 'datasets/zjdata_E1/'
+data_root = 'datasets/zjdata/'
 file_client_args = dict(backend='disk')
 
 bda_aug_conf = dict(
@@ -290,7 +288,7 @@ test_data_config = dict(
     data_root=data_root,
     pipeline=test_pipeline,
     classes=class_names,
-    ann_file=data_root + 'zjdet_E1_infos_val.pkl')
+    ann_file=data_root + 'bevdetv2-zjdata_infos_val.pkl')
 
 # data = dict(
 #     samples_per_gpu=4,
@@ -309,13 +307,13 @@ test_data_config = dict(
 #     test=test_data_config)
 
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=8,
     workers_per_gpu=4,
     train=dict(
         type='CBGSDataset',
         dataset=dict(
         data_root=data_root,
-        ann_file=data_root + 'zjdet_E1_infos_train.pkl',
+        ann_file=data_root + 'bevdetv2-zjdata_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,

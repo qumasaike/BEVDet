@@ -1,8 +1,8 @@
 import argparse
 
 import torch.onnx
-# from mmcv import Config
-from mmengine.config import Config
+from mmcv import Config
+# from mmengine.config import Config
 
 
 try:
@@ -19,6 +19,9 @@ from mmdet3d.datasets import build_dataloader, build_dataset
 from mmdet3d.models import build_model
 from mmdet.datasets import replace_ImageToTensor
 from tools.misc.fuse_conv_bn import fuse_module
+from calibration import Calibration, RotateMatirx2unitQ
+import numpy as np
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Deploy BEVDet with Tensorrt')
@@ -54,8 +57,7 @@ def main():
         model_prefix = model_prefix + '_fp16'
     cfg = Config.fromfile(args.config)
     cfg.model.pretrained = None
-    cfg.model.type = cfg.model.type + 'TRT'
-
+    cfg.model['pts_bbox_head'].type = cfg.model['pts_bbox_head'].type+'TRT'
     cfg = compat_cfg(cfg)
     cfg.gpu_ids = [0]
 
@@ -85,30 +87,47 @@ def main():
 
     # build the model and load checkpoint
     cfg.model.train_cfg = None
-    model = build_model(cfg.model, test_cfg=cfg.get('test_cfg'))
-    load_checkpoint(model, args.checkpoint, map_location='cpu')
+    t = cfg.model.type
+    cfg.model.type = t + 'TRT0'
+    model0 = build_model(cfg.model, test_cfg=cfg.get('test_cfg'))
+    load_checkpoint(model0, args.checkpoint, map_location='cpu')
+
     if args.fuse_conv_bn:
         model_prefix = model_prefix + '_fuse'
         model = fuse_module(model)
-    model.cuda()
-    model.eval()
+    model0.cuda()
+    model0.eval()
+
 
     for i, data in enumerate(data_loader):
-        img_inputs = [[t.cuda() for t in data['img_inputs'][0]]]
-        # img_metas = data['img_metas']
+        img_inputs0 = [[t.cuda() for t in data['img_inputs'][0]]]
         img_metas = None
-        input_dict = (img_inputs, img_metas)
+        input_dict0 = (img_inputs0, img_metas)
+        calib_path = "tools/calib_0519.pkl"
+        calib = Calibration(calib_path)
+        ego2sensors = []
+        intrinsics = []
+        for camera_id in calib.CAMERAS:
+            R_ = getattr(calib, 'R' + str(camera_id)).reshape(3,3) #rear2camera
+            T_ = getattr(calib, 'T' + str(camera_id)).reshape(3,1)
+            ego2sensor = np.vstack((np.hstack((R_, T_)),np.array([0.,0.,0.,1.])))
+            intrinsic = getattr(calib, 'P' + str(camera_id))[:3,:3]
+            ego2sensors.append(ego2sensor)
+            intrinsics.append(intrinsic)
+        ego2sensors = torch.tensor(ego2sensors).unsqueeze(0).cuda().float()
+        intrinsics = torch.tensor(intrinsics).unsqueeze(0).cuda().float()
+        model0.img_view_transformer.init_coord_imgs(ego2sensors, intrinsics)
         with torch.no_grad():
             torch.onnx.export(
-                model,
-                input_dict,
+                model0,
+                input_dict0,
                 args.work_dir + model_prefix + '.onnx',
                 opset_version=16,
                 input_names=[
                     'img_inputs', 'img_metas'
                 ],
-                output_names=['boxes_3d', 'scores_3d', 'labels_3d']
-                              )
+                output_names=['boxes_3d', 'scores_3d','labels_3d']     
+                                           )
         break
 
 

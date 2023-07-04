@@ -36,6 +36,8 @@ def single_gpu_test(model,
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
+        if '0308_001055' not in data['img_metas'][0]._data[0][0]['pts_filename']:
+            continue
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
 

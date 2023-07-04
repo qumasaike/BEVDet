@@ -203,7 +203,7 @@ model = dict(
 
 # Data
 dataset_type = 'NuScenesDataset'
-data_root = 'datasets/zjdata_E1/'
+data_root = 'datasets/zjdata/'
 file_client_args = dict(backend='disk')
 
 bda_aug_conf = dict(
@@ -290,7 +290,7 @@ test_data_config = dict(
     data_root=data_root,
     pipeline=test_pipeline,
     classes=class_names,
-    ann_file=data_root + 'zjdet_E1_infos_val.pkl')
+    ann_file=data_root + 'bevdetv2-zjdata_infos_val.pkl')
 
 # data = dict(
 #     samples_per_gpu=4,
@@ -315,7 +315,7 @@ data = dict(
         type='CBGSDataset',
         dataset=dict(
         data_root=data_root,
-        ann_file=data_root + 'zjdet_E1_infos_train.pkl',
+        ann_file=data_root + 'bevdetv2-zjdata_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,

@@ -4,8 +4,7 @@ _base_ = ['../_base_/datasets/nus-3d.py', '../_base_/default_runtime.py']
 # Global
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
-# point_cloud_range = [-26.8, -32.0, -3.0, 50.0, 32.0, 1.0]
-point_cloud_range = [-32.0, -26.8, -3.0, 32.0, 50.0,  1.0]
+point_cloud_range = [-26.8, -32.0, -3.0, 50.0, 32.0, 1.0]
 # For nuScenes we usually do 10-class detection
 class_names = [
     'Car', 'Van', 'Pedestrian', 'Cyclist', 'Trafficcone', 'Others'
@@ -75,9 +74,9 @@ model = dict(
         output_channels=64,
         Ncams=data_config['Ncams'],
         gn=True),
-    temporal_fusion=dict(
-        type='TemporalSelfAttention',),
-    dense_head=dict(type='DenseHead'),
+    # temporal_fusion=dict(
+    #     type='TemporalSelfAttention',),
+    # dense_head=dict(type='DenseHead'),
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=6,

@@ -4,14 +4,16 @@ from val import val
 
 class_mapping = {
   'Car':0,
-  'Truck':1,
+  'Van':1,
   'Pedestrian':2,
   'Cyclist':3,
   'Trafficcone':4, 
   'Others':5
 }
 
-results = json.load(open("trainzjdet_CenterHead_2daug/pts_bbox/results_nusc.json", "rb"))
+np.set_printoptions(suppress=True, threshold=np.nan)
+
+results = json.load(open("trainzjdet/pts_bbox/results_nusc.json", "rb"))
 for name in results['results'].keys():
     lines = []
     f = open('results/dt/' + name + '.txt','w')
