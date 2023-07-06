@@ -25,12 +25,17 @@ class ZJDet(MVXTwoStageDetector):
         img_bev_encoder_neck (dict): Configuration dict of the BEV encoder neck.
     """
 
-    def __init__(self, img_backbone, img_neck, img_view_transformer,voxel_feature_encoder, pts_bbox_head, train_cfg, test_cfg, **kwargs):
+    def __init__(self, img_backbone, img_neck, img_view_transformer,voxel_feature_encoder, pts_bbox_head, train_cfg, test_cfg, temporal_fusion=None, **kwargs):
         super(ZJDet, self).__init__(**kwargs)
         self.img_backbone = builder.build_backbone(img_backbone)
         self.img_neck = builder.build_neck(img_neck)
         self.img_view_transformer = builder.build_neck(img_view_transformer)
         self.voxel_feature_encoder = builder.build_voxel_encoder(voxel_feature_encoder)
+        if temporal_fusion is not None:
+            self.temporal_fusion = builder.build_fusion_layer(temporal_fusion)
+        else:
+            self.temporal_fusion = None
+
         if pts_bbox_head:
             pts_train_cfg = train_cfg.pts if train_cfg else None
             pts_bbox_head.update(train_cfg=pts_train_cfg)
@@ -63,7 +68,6 @@ class ZJDet(MVXTwoStageDetector):
         if not type(x) is list:
             x = [x]
         return x, None
-
 
     def extract_feat(self, points, img, img_metas, **kwargs):
         """Extract features from images and points."""
@@ -116,6 +120,8 @@ class ZJDet(MVXTwoStageDetector):
         # x = self.image_encoder(img_inputs[0])
         # x = self.img_view_transformer([x] + img_inputs[1:7] + [(img_H,img_W)])
         # img_feats = self.voxel_feature_encoder(x)
+        if self.temporal_fusion:
+            img_feats = self.temporal_fusion(img_feats + img_inputs[1:])
 
         losses = dict()
         losses_pts = self.forward_pts_train(img_feats, gt_bboxes_3d,

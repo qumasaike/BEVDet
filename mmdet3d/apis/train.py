@@ -213,6 +213,7 @@ def train_detector(model,
             num_gpus=len(cfg.gpu_ids),
             dist=distributed,
             seed=cfg.seed,
+            shuffle=cfg.data.shuffle,
             runner_type=runner_type,
             persistent_workers=cfg.data.get('persistent_workers', False))
         for ds in dataset

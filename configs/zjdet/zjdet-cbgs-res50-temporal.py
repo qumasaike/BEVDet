@@ -76,8 +76,10 @@ model = dict(
         Ncams=data_config['Ncams'],
         gn=True),
     temporal_fusion=dict(
-        type='TemporalSelfAttention',),
-    dense_head=dict(type='DenseHead'),
+        type='TemporalSelfAttention',
+        voxel_size=voxel_size,
+        point_cloud_range=point_cloud_range,),
+    # dense_head=dict(type='DenseHead'),
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=6,
@@ -136,74 +138,11 @@ model = dict(
             score_thr=0.05,
             min_bbox_size=0,
             max_num=500))
-
-
-    # pts_bbox_head=dict(
-    #     type='CenterHead',
-    #     in_channels=64,
-    #     tasks=[
-    #         dict(num_class=1, class_names=['Car']),
-    #         dict(num_class=1, class_names=['Truck']),
-    #         dict(num_class=1, class_names=['Pedestrian']),
-    #         dict(num_class=1, class_names=['Cyclist']),
-    #         dict(num_class=1, class_names=['Trafficcone']),
-    #         dict(num_class=1, class_names=['Others']),
-    #     ],
-    #     common_heads=dict(
-    #         reg=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
-    #     share_conv_channel=64,
-    #     bbox_coder=dict(
-    #         type='CenterPointBBoxCoder',
-    #         pc_range=point_cloud_range[:2],
-    #         post_center_range=[-6.8, -32.0, -3.0, 70, 32.0, 1.0],
-    #         max_num=500,
-    #         score_threshold=0.1,
-    #         out_size_factor=2,
-    #         voxel_size=voxel_size[:2],
-    #         code_size=9),
-    #     separate_head=dict(
-    #         type='SeparateHead', init_bias=-2.19, final_kernel=3),
-    #     loss_cls=dict(type='GaussianFocalLoss', reduction='mean'),
-    #     loss_bbox=dict(type='L1Loss', reduction='mean', loss_weight=0.25),
-    #     norm_bbox=True),
-    # model training and testing settings
-    # train_cfg=dict(
-    #     pts=dict(
-    #         point_cloud_range=point_cloud_range,
-    #         grid_size=[768, 640, 40],
-    #         voxel_size=voxel_size,
-    #         out_size_factor=2,
-    #         dense_reg=1,
-    #         gaussian_overlap=0.1,
-    #         max_objs=500,
-    #         min_radius=2,
-    #         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2])),
-    # test_cfg=dict(
-    #     pts=dict(
-    #         pc_range=point_cloud_range[:2],
-    #         post_center_limit_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
-    #         max_per_img=500,
-    #         max_pool_nms=False,
-    #         min_radius=[4, 12, 10, 1, 0.85, 0.175],
-    #         score_threshold=0.1,
-    #         out_size_factor=2,
-    #         voxel_size=voxel_size[:2],
-    #         pre_max_size=1000,
-    #         post_max_size=83,
-
-    #         # Scale-NMS
-    #         nms_type=[
-    #             'rotate', 'rotate', 'rotate', 'circle', 'rotate', 'rotate'
-    #         ],
-    #         nms_thr=[0.2, 0.2, 0.2, 0.2, 0.2, 0.5],
-    #         nms_rescale_factor=[
-    #             1.0, [0.7, 0.7], [0.4, 0.55], 1.1, [1.0, 1.0], [4.5, 9.0]
-    #         ]))
             )
 
 # Data
 dataset_type = 'NuScenesDataset'
-data_root = 'datasets/zjdata/'
+data_root = 'datasets/zjdata_E1/'
 file_client_args = dict(backend='disk')
 
 bda_aug_conf = dict(
@@ -290,7 +229,7 @@ test_data_config = dict(
     data_root=data_root,
     pipeline=test_pipeline,
     classes=class_names,
-    ann_file=data_root + 'bevdetv2-zjdata_infos_val.pkl')
+    ann_file=data_root + 'zjdet_E1_infos_val.pkl')
 
 # data = dict(
 #     samples_per_gpu=4,
@@ -309,13 +248,13 @@ test_data_config = dict(
 #     test=test_data_config)
 
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=4,
     train=dict(
         type='CBGSDataset',
         dataset=dict(
         data_root=data_root,
-        ann_file=data_root + 'bevdetv2-zjdata_infos_train.pkl',
+        ann_file=data_root + 'zjdet_E1_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,

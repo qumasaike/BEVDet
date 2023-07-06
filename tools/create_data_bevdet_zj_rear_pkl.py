@@ -10,34 +10,7 @@ from tools.data_converter import nuscenes_converter as nuscenes_converter
 import os
 from calibration import Calibration, RotateMatirx2unitQ
 import cv2
-map_name_from_general_to_detection = {
-    'human.pedestrian.adult': 'pedestrian',
-    'human.pedestrian.child': 'pedestrian',
-    'human.pedestrian.wheelchair': 'ignore',
-    'human.pedestrian.stroller': 'ignore',
-    'human.pedestrian.personal_mobility': 'ignore',
-    'human.pedestrian.police_officer': 'pedestrian',
-    'human.pedestrian.construction_worker': 'pedestrian',
-    'animal': 'ignore',
-    'vehicle.car': 'car',
-    'vehicle.motorcycle': 'motorcycle',
-    'vehicle.bicycle': 'bicycle',
-    'vehicle.bus.bendy': 'bus',
-    'vehicle.bus.rigid': 'bus',
-    'vehicle.truck': 'truck',
-    'vehicle.construction': 'construction_vehicle',
-    'vehicle.emergency.ambulance': 'ignore',
-    'vehicle.emergency.police': 'ignore',
-    'vehicle.trailer': 'trailer',
-    'movable_object.barrier': 'barrier',
-    'movable_object.trafficcone': 'traffic_cone',
-    'movable_object.pushable_pullable': 'ignore',
-    'movable_object.debris': 'ignore',
-    'static_object.bicycle_rack': 'ignore',
-}
-# classes = [
-#  'Car', 'Truck', 'Pedestrian', 'Cyclist', 'Trafficcone', 'Others'
-# ]
+
 classes = {
  'Car':0, 'Truck':1, 'Van':1, 'Pedestrian':2, 'Cyclist':3, 'Trafficcone':4, 'Others':5
 }
@@ -59,6 +32,14 @@ def nuscenes_data_prep(root_path, info_prefix, version, max_sweeps=10):
             info['lidar2ego_translation'] = lidar2ego_translation[:,3]
             info['lidar2ego_rotation'] = RotateMatirx2unitQ(lidar2ego_translation)
             info['token'] = fil
+
+            pose = open(os.path.join(root_path, 'training', 'pose', fil + '.txt'), 'r').readlines()[0]
+            pose = [float(_) for _ in pose.split(' ')]
+            ego2global_translation = np.array(pose[:3]) # x y z
+            info['ego2global_translation'] = ego2global_translation
+            ego2global_rotation = np.array(pose[3:]) # qw qx qy qz
+            info['sensor2ego_rotation'] = ego2global_rotation
+
             cams = {}
             for camera_id in calib.CAMERAS:
                 cam = {}
@@ -73,8 +54,8 @@ def nuscenes_data_prep(root_path, info_prefix, version, max_sweeps=10):
                 cam['sensor2lidar_translation'] = sensor2lidar[:3,3]
                 cam['sensor2lidar_rotation'] = RotateMatirx2unitQ(sensor2lidar[:3,:3])
                 cam['cam_intrinsic'] = getattr(calib, 'P' + str(camera_id))[:3,:3]
-                cam['ego2global_translation'] = np.array([0.,0.,0.])
-                cam['ego2global_rotation'] = np.array([1.,0.,0.,0.])
+                cam['ego2global_translation'] = ego2global_translation 
+                cam['ego2global_rotation'] = ego2global_rotation  
                 cams['image' + str(camera_id)] = cam
             info['cams'] = cams
             labels = open(os.path.join(root_path, 'training', 'label', fil + '.txt'), 'r').readlines()

@@ -186,13 +186,5 @@ class GridSample(nn.Module):
         Voxels = F.grid_sample(
                               features.view(B*N,C,feature_H,feature_W), 
                               norm_coord_img.view(B*N, bev_D*bev_H, bev_W,2), align_corners=True).view(B, N, C, bev_D, bev_H, bev_W)
-        # Voxels = []
-        # features = features.view(B*N,C,feature_H,feature_W)
-        # norm_coord_img = norm_coord_img.view(B*N, bev_D*bev_H, bev_W,2)
-        # for i in range(len(features)):
-        #     Voxels.append(F.grid_sample(
-        #                       features[i].view(1,C,feature_H,feature_W), 
-        #                       norm_coord_img[i].view(1, bev_D*bev_H, bev_W,2), align_corners=True))
-        # Voxels = torch.cat(Voxels).view(B, N, C, bev_D, bev_H, bev_W)
-        # Voxels = norm_coord_img.view(B, N, 2, bev_D, bev_H, bev_W).repeat((1,1,16,1,1,1))
+
         return Voxels
