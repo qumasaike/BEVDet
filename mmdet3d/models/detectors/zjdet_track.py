@@ -11,7 +11,7 @@ from .mvx_two_stage import MVXTwoStageDetector
 
 
 @DETECTORS.register_module()
-class ZJDet(MVXTwoStageDetector):
+class ZJDetTrack(MVXTwoStageDetector):
 # class ZJDet(CenterPoint):
   
     r"""BEVDet paradigm for multi-camera 3D object detection.
@@ -26,7 +26,7 @@ class ZJDet(MVXTwoStageDetector):
     """
 
     def __init__(self, img_backbone, img_neck, img_view_transformer,voxel_feature_encoder, pts_bbox_head, train_cfg, test_cfg, temporal_fusion=None, track_fusion=None, **kwargs):
-        super(ZJDet, self).__init__(**kwargs)
+        super(ZJDetTrack, self).__init__(**kwargs)
         self.img_backbone = builder.build_backbone(img_backbone)
         self.img_neck = builder.build_neck(img_neck)
         self.img_view_transformer = builder.build_neck(img_view_transformer)
@@ -89,6 +89,7 @@ class ZJDet(MVXTwoStageDetector):
                       img_inputs=None,
                       proposals=None,
                       gt_bboxes_ignore=None,
+                      gt_inds_3d=None,
                       **kwargs):
         """Forward training function.
 
@@ -130,9 +131,28 @@ class ZJDet(MVXTwoStageDetector):
         losses = dict()
         losses_pts = self.forward_pts_train(img_feats, gt_bboxes_3d,
                                             gt_labels_3d, img_metas,
+                                            gt_inds_3d,
                                             gt_bboxes_ignore)
         losses.update(losses_pts)
         return losses
+
+
+    def forward_pts_train(self,
+                          bev_embed, 
+                          gt_bboxes_3d,
+                          gt_labels_3d, 
+                          img_metas,
+                          gt_inds_3d,
+                          gt_bboxes_ignore):
+        det_output = self.pts_bbox_head(
+                          bev_embed,
+                          gt_bboxes_3d,
+                          gt_labels_3d,
+                          gt_inds_3d,
+                          img_metas,
+        )
+        return det_output
+
 
     def forward_test(self,
                      points=None,
@@ -204,105 +224,3 @@ class ZJDet(MVXTwoStageDetector):
         assert self.with_pts_bbox
         outs = self.pts_bbox_head(img_feats)
         return outs
-
- 
-@DETECTORS.register_module()
-class ZJDetTRT0(ZJDet):
-
-    def forward(
-        self,
-        img_inputs=None,
-        img_metas=None,
-        points=None,
-        proposals=None,
-        gt_bboxes_ignore=None,
-        **kwargs
-    ):
-        from mmdet3d.core.bbox import get_box_type
-        box_type_3d, box_mode_3d = get_box_type("LiDAR")
-        img_metas = [[{
-          'flip':False,
-          'pcd_horizontal_flip':False,
-          'pcd_vertical_flip':False,
-          'box_mode_3d':box_mode_3d,
-          'box_type_3d':box_type_3d,
-          'pcd_scale_factor':1.0,
-          'pts_filename':""
-        }]]
-
-
-        # img=img_inputs[0]
-        # img_H,img_W = img[0].shape[-2:]
-        # img_feats = self.image_encoder(img[0])
-        # return img_feats
-        # voxels = self.img_view_transformer([img_feats] + img[1:8] + [(img_H,img_W)])
-        # out = self.voxel_feature_encoder(voxels)
-        # boxes_3d, scores_3d, labels_3d = self.simple_test_pts(voxels, img_metas[0], rescale=False)
-        # return boxes_3d, scores_3d, labels_3d
-
-        img_feats, pts_feats, _ = self.extract_feat(
-            points, img=img_inputs[0], img_metas=img_metas, **kwargs)
-        boxes_3d, scores_3d, labels_3d = self.simple_test_pts(img_feats, img_metas[0], rescale=False)
-
-        return boxes_3d[:,:7], scores_3d, labels_3d
-
-
-    def simple_test_pts(self, x, img_metas, rescale=False):
-        """Test function of point cloud branch."""
-        outs = self.pts_bbox_head(x)
-        results = self.pts_bbox_head.get_bboxes(
-            *outs, img_metas, rescale=rescale)
-        bboxes, scores, labels = results[0]
-        return bboxes, scores, labels
-
-
-
-@DETECTORS.register_module()
-class ZJDetTRT1(ZJDet):
-
-    def forward(
-        self,
-        img_inputs=None,
-        img_metas=None,
-        img_feats=None,
-        points=None,
-        proposals=None,
-        gt_bboxes_ignore=None,
-        
-        **kwargs
-    ):
-        from mmdet3d.core.bbox import get_box_type
-        box_type_3d, box_mode_3d = get_box_type("LiDAR")
-        img_metas = [[{
-          'flip':False,
-          'pcd_horizontal_flip':False,
-          'pcd_vertical_flip':False,
-          'box_mode_3d':box_mode_3d,
-          'box_type_3d':box_type_3d,
-          'pcd_scale_factor':1.0,
-          'pts_filename':""
-        }]]
-
-        img=img_inputs[0]
-        img_H,img_W = img[0].shape[-2:]
-        voxels = self.img_view_transformer([img_feats] + img[1:8] + [(img_H,img_W)])
-        out = self.voxel_feature_encoder(voxels)
-        boxes_3d, scores_3d, labels_3d = self.simple_test_pts(out, img_metas[0], rescale=False)
-
-        return boxes_3d, scores_3d, labels_3d
-
-        img_feats, pts_feats, _ = self.extract_feat(
-            points, img=img_inputs[0], img_metas=img_metas, **kwargs)
-        result_dict = {}
-        boxes_3d, scores_3d, labels_3d = self.simple_test_pts(img_feats, img_metas[0], rescale=False)
-
-        return boxes_3d, scores_3d, labels_3d
-
-
-    def simple_test_pts(self, x, img_metas, rescale=False):
-        """Test function of point cloud branch."""
-        outs = self.pts_bbox_head(x)
-        results = self.pts_bbox_head.get_bboxes(
-            *outs, img_metas, rescale=rescale)
-        bboxes, scores, labels = results[0]
-        return bboxes, scores, labels

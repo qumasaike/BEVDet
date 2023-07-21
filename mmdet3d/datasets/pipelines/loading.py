@@ -1057,8 +1057,8 @@ class LoadAnnotationsBEVDepth(object):
         return gt_boxes, rot_mat
 
     def __call__(self, results):
-        gt_boxes, gt_labels = results['ann_infos']
-        gt_boxes, gt_labels = torch.Tensor(gt_boxes), torch.tensor(gt_labels)
+        gt_boxes, gt_labels, gt_inds = results['ann_infos']
+        gt_boxes, gt_labels, gt_inds = torch.Tensor(gt_boxes), torch.tensor(gt_labels), torch.tensor(gt_inds)
         rotate_bda, scale_bda, flip_dx, flip_dy = self.sample_bda_augmentation(
         )
         bda_mat = torch.zeros(4, 4)
@@ -1072,6 +1072,7 @@ class LoadAnnotationsBEVDepth(object):
             LiDARInstance3DBoxes(gt_boxes, box_dim=gt_boxes.shape[-1],
                                  origin=(0.5, 0.5, 0.5))
         results['gt_labels_3d'] = gt_labels
+        results['gt_inds_3d'] = gt_inds
         imgs, rots, trans, intrins = results['img_inputs'][:4]
         post_rots, post_trans = results['img_inputs'][4:]
         rots_inverse = torch.inverse(rots)

@@ -120,7 +120,7 @@ class TemporalSelfAttention(BaseModule):
         self.bev_embedding = nn.Embedding(
             self.bev_h * self.bev_w, self.embed_dims)
         self.positional_encoding = LearnedPositionalEncoding(
-            32, self.bev_h, self.bev_w)
+            embed_dims//2, self.bev_h, self.bev_w)
         self.prepose = None
         self.pre_spatial_features_2d = None
         self.norm = build_norm_layer({"type": "LN"}, self.embed_dims)[1]
@@ -344,4 +344,4 @@ class TemporalSelfAttention(BaseModule):
                     (show.max()-show.min())*255)
         self.pre_ego2globals = self.ego2globals 
         self.pre_spatial_features_2d = output.detach()
-        return output.unsqueeze(0)
+        return output

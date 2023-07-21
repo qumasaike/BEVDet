@@ -264,6 +264,8 @@ class NuScenesDataset(Custom3DDataset):
             else:
                 assert 'bevdet' in self.img_info_prototype
                 input_dict.update(dict(curr=info))
+                input_dict['pre'] = info['pre']
+                input_dict['next'] = info['next']
                 if '4d' in self.img_info_prototype:
                     info_adj_list = self.get_adj_info(info, index)
                     input_dict.update(dict(adjacent=info_adj_list))
@@ -302,6 +304,7 @@ class NuScenesDataset(Custom3DDataset):
             mask = info['num_lidar_pts'] > 0
         gt_bboxes_3d = info['gt_boxes'][mask]
         gt_names_3d = info['gt_names'][mask]
+        gt_inds = info['gt_inds'][mask]
         gt_labels_3d = []
         for cat in gt_names_3d:
             if cat in self.CLASSES:
@@ -326,7 +329,8 @@ class NuScenesDataset(Custom3DDataset):
         anns_results = dict(
             gt_bboxes_3d=gt_bboxes_3d,
             gt_labels_3d=gt_labels_3d,
-            gt_names=gt_names_3d)
+            gt_names=gt_names_3d,
+            gt_inds=gt_inds)
         return anns_results
 
     def _format_bbox(self, results, jsonfile_prefix=None):

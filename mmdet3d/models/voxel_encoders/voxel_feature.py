@@ -136,12 +136,20 @@ class VoxelFeature(nn.Module):
         self.rpn3d_conv3 = hourglass2d(self.output_channels, gn=self.GN)
 
         self.init_params()
+        # self.height_compress = nn.Sequential(
+        #     nn.Conv2d(32*Ncams, 32, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(32, 16, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(16, 8, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+        #     nn.ReLU(inplace=True),
+        # )
         self.height_compress = nn.Sequential(
-            nn.Conv2d(32*Ncams, 32, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+            nn.Conv2d(32*Ncams, 32*4, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 16, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+            nn.Conv2d(32*4, 32*2, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(16, 8, kernel_size=(3, 1), stride=1, padding=(1, 0)),
+            nn.Conv2d(64, 32, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.ReLU(inplace=True),
         )
 

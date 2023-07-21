@@ -9,36 +9,6 @@ def RotateMatirx2unitQ(m):
     z = (m[1,0] - m[0,1]) / (4*w)
     return np.array([w,x,y,z])
 
-def get_calib_from_file(calib_file):
-    with open(calib_file) as f:
-        lines = f.readlines()
-
-    calib_data = {}
-    # for key in ['P2', 'P3', 'R0_rect', 'Tr_velo_to_cam', 'R2_3', 'T2_3', 'dist2', 'dist3']:
-    for line in lines:
-        if line == '':
-            continue
-        line = line.strip()
-        splits = [x for x in line.split(' ') if len(x.strip()) > 0]
-        obj = splits[1:]
-        key = splits[0][:-1]
-        if key[0] == 'P':
-            calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 4)
-        elif key[0] == 'R':
-            calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 3)
-        elif key[0] == 'T':
-            calib_data[key] = np.array(obj, dtype=np.float32).reshape(3)
-        elif key == 'V2C':
-            calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
-        elif key == 'CAMERAS':
-            calib_data[key] = np.array(obj, dtype=np.uint8)
-        elif key == 'C2REAR':
-            calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
-        else:
-            print('error: calib key: ', key)
-
-
-    return calib_data
 
 def unproject_depth_map_to_3d(depth_map, calib, image=None):
     cu, cv = calib.cu, calib.cv
@@ -82,56 +52,14 @@ cameras_id = {
   'left_front':7,
 }
 
-def get_calib_from_file(calib_file):
-    if 'txt' in calib_file:
-        with open(calib_file) as f:
-            lines = f.readlines()
-
-        calib_data = {}
-        # for key in ['P2', 'P3', 'R0_rect', 'Tr_velo_to_cam', 'R2_3', 'T2_3', 'dist2', 'dist3']:
-        for line in lines:
-            if line == '':
-                continue
-            line = line.strip()
-            splits = [x for x in line.split(' ') if len(x.strip()) > 0]
-            obj = splits[1:]
-            key = splits[0][:-1]
-            if key[0] == 'P':
-                calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 4)
-            elif key[0] == 'R':
-                calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 3)
-            elif key[0] == 'T':
-                calib_data[key] = np.array(obj, dtype=np.float32).reshape(3)
-            elif key == 'V2C':
-                calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
-            elif key == 'CAMERAS':
-                calib_data[key] = np.array(obj, dtype=np.uint8)
-            elif key == 'C2REAR':
-                calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
-            else:
-                print('error: calib key: ', key)
-    elif 'pkl' in calib_file:
-        pkl = pickle.load(open(calib_file,'rb'))
-        calib_data = {}
-        calib_data['CAMERAS'] = []
-        for camera in pkl['cameras'].keys():
-            intrinsic = pkl['cameras'][camera]['intrinsic']
-            camera_id = cameras_id[camera]
-            calib_data['P' + str(camera_id)] = np.array([[intrinsic['fx'],0.,intrinsic['cx']],
-                                                          [0, intrinsic['fy'],intrinsic['cy']],
-                                                          [0.,0.,1.]])
-            rear_to_camera = np.linalg.inv(pkl['cameras'][camera]['camera_to_rear'])
-            calib_data['R' + str(camera_id)] = rear_to_camera[:3,:3]
-            calib_data['T' + str(camera_id)] = rear_to_camera[:3,3]
-            calib_data['CAMERAS'].append(camera_id)
-        calib_data['lidar_to_rear'] =  pkl['lidar']['lidar_to_rear']
-    return calib_data
 
 
 class Calibration(object):
     def __init__(self, calib_file):
+        self.next = None
+        self.pre = None
         if not isinstance(calib_file, dict):
-            calib = get_calib_from_file(calib_file)
+            calib = self.get_calib_from_file(calib_file)
         else:
             calib = calib_file
         for camera_id in calib['CAMERAS']:
@@ -141,6 +69,54 @@ class Calibration(object):
         self.__dict__.update(calib)
         self.flipped = False
         self.offsets = [0, 0]
+
+    def get_calib_from_file(self, calib_file):
+        if 'txt' in calib_file:
+            with open(calib_file) as f:
+                lines = f.readlines()
+
+            calib_data = {}
+            # for key in ['P2', 'P3', 'R0_rect', 'Tr_velo_to_cam', 'R2_3', 'T2_3', 'dist2', 'dist3']:
+            for line in lines:
+                if line == '':
+                    continue
+                line = line.strip()
+                splits = [x for x in line.split(' ') if len(x.strip()) > 0]
+                obj = splits[1:]
+                key = splits[0][:-1]
+                if key[0] == 'P':
+                    calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 4)
+                elif key[0] == 'R':
+                    calib_data[key] = np.array(obj, dtype=np.float32).reshape(3, 3)
+                elif key[0] == 'T':
+                    calib_data[key] = np.array(obj, dtype=np.float32).reshape(3)
+                elif key == 'V2C':
+                    calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
+                elif key == 'CAMERAS':
+                    calib_data[key] = np.array(obj, dtype=np.uint8)
+                elif key == 'C2REAR':
+                    calib_data[key] = np.array(obj, dtype=np.float32).reshape(3,4)
+                else:
+                    print('error: calib key: ', key)
+        elif 'pkl' in calib_file:
+            pkl = pickle.load(open(calib_file,'rb'))
+            calib_data = {}
+            calib_data['CAMERAS'] = []
+            for camera in pkl['cameras'].keys():
+                intrinsic = pkl['cameras'][camera]['intrinsic']
+                camera_id = cameras_id[camera]
+                calib_data['P' + str(camera_id)] = np.array([[intrinsic['fx'],0.,intrinsic['cx']],
+                                                              [0, intrinsic['fy'],intrinsic['cy']],
+                                                              [0.,0.,1.]])
+                rear_to_camera = np.linalg.inv(pkl['cameras'][camera]['camera_to_rear'])
+                calib_data['R' + str(camera_id)] = rear_to_camera[:3,:3]
+                calib_data['T' + str(camera_id)] = rear_to_camera[:3,3]
+                calib_data['CAMERAS'].append(camera_id)
+            calib_data['lidar_to_rear'] =  pkl['lidar']['lidar_to_rear']
+            self.next = pkl['next']
+            self.pre = pkl['pre']
+        return calib_data
+
 
     def corners3d_to_img_boxes(self, corners3d, image_id):
         """
